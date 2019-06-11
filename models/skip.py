@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
+
 from .common import *
+from .latent import LatentBlock
 
 
 def skip(num_input_channels=2,
@@ -8,11 +10,13 @@ def skip(num_input_channels=2,
          num_channels_down=[16, 32, 64, 128, 128],
          num_channels_up=[16, 32, 64, 128, 128],
          num_channels_skip=[4, 4, 4, 4, 4],
+         num_channels_latent=[16, 32, 64, 128, 128],
          filter_size_down=3,
          filter_size_up=3,
          filter_skip_size=1,
          need_sigmoid=True,
          need_bias=True,
+         use_latent=False,
          pad='zero',
          upsample_mode='nearest',
          downsample_mode='stride',
@@ -75,6 +79,7 @@ def skip(num_input_channels=2,
         deeper.add(bn(num_channels_down[i]))
         deeper.add(act(act_fun))
 
+        # TODO: OOM here
         deeper.add(conv(num_channels_down[i], num_channels_down[i], filter_size_down[i], bias=need_bias, pad=pad))
         deeper.add(bn(num_channels_down[i]))
         deeper.add(act(act_fun))
@@ -89,7 +94,16 @@ def skip(num_input_channels=2,
             k = num_channels_up[i + 1]
 
         # deeper features: recover to current spatial size
-        deeper.add(nn.Upsample(scale_factor=2, mode=upsample_mode[i]))
+        if use_latent:
+            # TODO: validate parameters here
+            latent_block = LatentBlock(k,
+                                       num_channels_latent[i],
+                                       upsample_ratio=2,
+                                       upsample_mode=upsample_mode[i],
+                                       non_linear_layer=nn.LeakyReLU)
+            deeper.add(latent_block)
+        else:
+            deeper.add(nn.Upsample(scale_factor=2, mode=upsample_mode[i]))
 
         model_tmp.add(conv(num_channels_skip[i] + k, num_channels_up[i], filter_size_up[i], 1, bias=need_bias, pad=pad))
         model_tmp.add(bn(num_channels_up[i]))

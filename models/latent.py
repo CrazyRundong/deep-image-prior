@@ -123,7 +123,7 @@ class LatentBlock(nn.Module):
         super(LatentBlock, self).__init__()
 
         if isinstance(latent_channels, int):
-            latent_channels = (latent_channels, )
+            latent_channels = (latent_channels,)
         assert len(latent_channels) == num_kernels
         assert latent_proj_mode in ("asymmetric", "symmetric")
 
@@ -217,6 +217,13 @@ class LatentBlock(nn.Module):
         out_feat = self.channel_expand_mapping(out_feat)
 
         if self.use_residual:
-            return x + out_feat * self.gamma
+            if self.upsample_ratio > 1:
+                residual = F.interpolate(x,
+                                         scale_factor=self.upsample_ratio,
+                                         mode=self.upsample_mode,
+                                         align_corners=False if "linear" in self.upsample_mode else None)
+            else:
+                residual = x
+            return residual + out_feat * self.gamma
         else:
             return out_feat
